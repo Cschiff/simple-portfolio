@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Finance Portfolios</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-brand">
+        <p class="eyebrow">Personal finance</p>
+        <h1>Portfolios</h1>
+      </div>
+      <div class="topbar-actions">
+        <label class="field-inline">
+          <span>Currency</span>
+          <select id="currency-select" aria-label="Currency">
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <option value="BRL">BRL</option>
+            <option value="CAD">CAD</option>
+            <option value="JPY">JPY</option>
+          </select>
+        </label>
+        <button type="button" id="btn-export" class="btn btn-secondary">Export</button>
+        <button type="button" id="btn-import" class="btn btn-secondary">Import</button>
+        <input id="import-file" type="file" accept="application/json,.json" hidden />
+      </div>
+    </header>
+
+    <main>
+      <section id="view-overview">
+        <div class="summary-bar">
+          <div>
+            <p class="muted">Net worth</p>
+            <p id="grand-total" class="hero-number">$0.00</p>
+          </div>
+          <button type="button" id="btn-add-portfolio" class="btn btn-primary">New portfolio</button>
+        </div>
+        <div id="overview-allocations" class="allocation-grid" hidden></div>
+        <div id="portfolio-grid" class="card-grid"></div>
+        <div id="overview-empty" class="empty-state" hidden>
+          <h2>No portfolios yet</h2>
+          <p>Create a portfolio to start tracking cash, stocks, and other assets by hand.</p>
+          <button type="button" id="btn-add-portfolio-empty" class="btn btn-primary">New portfolio</button>
+        </div>
+      </section>
+
+      <section id="view-detail" hidden>
+        <button type="button" id="btn-back" class="btn btn-ghost">All portfolios</button>
+        <div class="detail-header">
+          <div class="detail-title">
+            <label class="sr-only" for="portfolio-name">Portfolio name</label>
+            <input id="portfolio-name" class="name-input" type="text" maxlength="80" />
+            <p id="detail-meta" class="muted"></p>
+          </div>
+          <div class="detail-actions">
+            <p id="portfolio-total" class="hero-number">$0.00</p>
+            <button type="button" id="btn-delete-portfolio" class="btn btn-danger">Delete portfolio</button>
+          </div>
+        </div>
+        <div id="detail-allocations" class="allocation-grid"></div>
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Assets</h2>
+            <button type="button" id="btn-add-asset" class="btn btn-primary">Add asset</button>
+          </div>
+          <div class="table-wrap">
+            <table class="asset-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Risk</th>
+                  <th class="num">Value</th>
+                  <th class="num">Share</th>
+                  <th class="actions-col"><span class="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody id="asset-table-body"></tbody>
+            </table>
+          </div>
+          <div id="assets-empty" class="empty-state compact" hidden>
+            <p>This portfolio has no assets yet. Add one and set its value manually.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="asset-dialog">
+      <form id="asset-form" method="dialog">
+        <h2 id="asset-dialog-title">Add asset</h2>
+        <label>
+          Name
+          <input id="asset-name" name="name" type="text" required maxlength="80" autocomplete="off" />
+        </label>
+        <label>
+          Type
+          <select id="asset-type" name="type" required></select>
+        </label>
+        <label>
+          Risk
+          <select id="asset-risk" name="risk" required></select>
+        </label>
+        <label>
+          Value
+          <input id="asset-value" name="value" type="number" min="0" step="0.01" required />
+        </label>
+        <div class="dialog-actions">
+          <button type="button" id="btn-asset-cancel" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
