@@ -3,6 +3,7 @@
 
   var STORAGE_KEY = "finance-portfolios-v1";
   var DEFAULT_TYPES = ["Cash", "Stocks", "Bonds", "Crypto", "Real Estate", "Other"];
+  var DEFAULT_PLATFORMS = ["Binance", "Nexo", "Interactive Brokers"];
   var RISK_LEVELS = ["Low", "Medium", "High"];
   var TYPE_CLASS = {
     Cash: "type-cash",
@@ -42,9 +43,13 @@
     assetForm: document.getElementById("asset-form"),
     assetDialogTitle: document.getElementById("asset-dialog-title"),
     assetName: document.getElementById("asset-name"),
+    assetPlatform: document.getElementById("asset-platform"),
     assetType: document.getElementById("asset-type"),
     assetRisk: document.getElementById("asset-risk"),
-    assetValue: document.getElementById("asset-value")
+    assetValue: document.getElementById("asset-value"),
+    assetPriceUrl: document.getElementById("asset-price-url"),
+    newPlatformRow: document.getElementById("new-platform-row"),
+    newPlatformName: document.getElementById("new-platform-name")
   };
 
   var state = loadState();
@@ -64,6 +69,7 @@
       version: 1,
       currency: "USD",
       assetTypes: DEFAULT_TYPES.slice(),
+      platforms: DEFAULT_PLATFORMS.slice(),
       portfolios: []
     };
   }
@@ -101,6 +107,7 @@
     next.assetTypes = Array.isArray(data.assetTypes) && data.assetTypes.length
       ? data.assetTypes.slice()
       : DEFAULT_TYPES.slice();
+    next.platforms = mergePlatforms(data.platforms, data.portfolios);
     next.portfolios = data.portfolios.map(function (portfolio) {
       return {
         id: portfolio.id,
@@ -109,9 +116,11 @@
           return {
             id: asset.id,
             name: asset.name,
+            platform: typeof asset.platform === "string" ? asset.platform : "",
             type: asset.type,
             risk: asset.risk,
-            value: Number(asset.value)
+            value: Number(asset.value),
+            priceUrl: typeof asset.priceUrl === "string" ? asset.priceUrl : ""
           };
         })
       };
@@ -169,11 +178,57 @@
     }, []);
   }
 
+  function addUniquePlatform(list, seen, name) {
+    name = (name || "").trim();
+    var key = name.toLowerCase();
+    if (!name || seen[key]) return;
+    seen[key] = true;
+    list.push(name);
+  }
+
+  function mergePlatforms(saved, portfolios) {
+    var list = [];
+    var seen = {};
+    DEFAULT_PLATFORMS.forEach(function (name) {
+      addUniquePlatform(list, seen, name);
+    });
+    (Array.isArray(saved) ? saved : []).forEach(function (name) {
+      addUniquePlatform(list, seen, name);
+    });
+    (Array.isArray(portfolios) ? portfolios : []).forEach(function (portfolio) {
+      (portfolio.assets || []).forEach(function (asset) {
+        addUniquePlatform(list, seen, asset.platform);
+      });
+    });
+    return list;
+  }
+
+  function allPlatforms() {
+    return mergePlatforms(state.platforms, state.portfolios);
+  }
+
+  function knownPlatforms() {
+    return allPlatforms();
+  }
+
+  function platformClass(label) {
+    var palette = ["type-cash", "type-stocks", "type-bonds", "type-crypto", "type-real-estate", "type-other"];
+    var hash = 0;
+    var text = label || "";
+    for (var i = 0; i < text.length; i++) {
+      hash = (hash + text.charCodeAt(i) * (i + 1)) % palette.length;
+    }
+    return palette[hash];
+  }
+
   function allocation(assets, key, order) {
     var total = sumAssets(assets);
     var map = {};
     assets.forEach(function (asset) {
       var group = asset[key];
+      if (key === "platform") {
+        group = (group || "").trim() || "Unspecified";
+      }
       map[group] = (map[group] || 0) + (Number(asset.value) || 0);
     });
     return order
@@ -207,8 +262,10 @@
   function renderAllocations(target, assets) {
     var typeItems = allocation(assets, "type", state.assetTypes);
     var riskItems = allocation(assets, "risk", RISK_LEVELS);
+    var platformItems = allocation(assets, "platform", knownPlatforms().concat(["Unspecified"]));
     target.innerHTML =
       allocationCard("By type", typeItems, typeClass) +
+      allocationCard("By platform", platformItems, platformClass) +
       allocationCard("By risk", riskItems, function (label) {
         return RISK_BAR[label] || "type-other";
       });
@@ -254,6 +311,21 @@
       legend +
       "</div></article>"
     );
+  }
+
+  function normalizePriceUrl(value) {
+    var url = (value || "").trim();
+    if (!url) return "";
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {
+      url = "https://" + url;
+    }
+    try {
+      var parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+      return parsed.href;
+    } catch (err) {
+      return "";
+    }
   }
 
   function escapeHtml(value) {
@@ -373,6 +445,14 @@
           "<tr>" +
           "<td>" +
           escapeHtml(asset.name) +
+          (asset.priceUrl
+            ? ' <a class="price-link" href="' +
+              escapeHtml(asset.priceUrl) +
+              '" target="_blank" rel="noopener noreferrer">Price</a>'
+            : "") +
+          "</td>" +
+          "<td>" +
+          escapeHtml((asset.platform || "").trim() || "—") +
           "</td>" +
           "<td>" +
           escapeHtml(asset.type) +
@@ -410,6 +490,9 @@
   }
 
   function fillAssetSelects() {
+    var currentType = els.assetType.value;
+    var currentRisk = els.assetRisk.value;
+    var currentPlatform = els.assetPlatform.value;
     els.assetType.innerHTML = state.assetTypes
       .map(function (type) {
         return "<option value=\"" + escapeHtml(type) + "\">" + escapeHtml(type) + "</option>";
@@ -418,6 +501,43 @@
     els.assetRisk.innerHTML = RISK_LEVELS.map(function (risk) {
       return "<option value=\"" + escapeHtml(risk) + "\">" + escapeHtml(risk) + "</option>";
     }).join("");
+    var platforms = allPlatforms();
+    els.assetPlatform.innerHTML =
+      '<option value="" disabled>Select a platform</option>' +
+      platforms
+        .map(function (platform) {
+          return "<option value=\"" + escapeHtml(platform) + "\">" + escapeHtml(platform) + "</option>";
+        })
+        .join("");
+    if (currentType) els.assetType.value = currentType;
+    if (currentRisk) els.assetRisk.value = currentRisk;
+    if (currentPlatform) els.assetPlatform.value = currentPlatform;
+  }
+
+  function hideNewPlatformRow() {
+    els.newPlatformRow.hidden = true;
+    els.newPlatformName.value = "";
+  }
+
+  function saveNewPlatform() {
+    var name = els.newPlatformName.value.trim();
+    if (!name) {
+      els.newPlatformName.focus();
+      return;
+    }
+    var existing = allPlatforms().find(function (platform) {
+      return platform.toLowerCase() === name.toLowerCase();
+    });
+    if (existing) {
+      fillAssetSelects();
+      els.assetPlatform.value = existing;
+    } else {
+      state.platforms.push(name);
+      saveState();
+      fillAssetSelects();
+      els.assetPlatform.value = name;
+    }
+    hideNewPlatformRow();
   }
 
   function addPortfolio() {
@@ -458,9 +578,12 @@
       : null;
     els.assetDialogTitle.textContent = asset ? "Edit asset" : "Add asset";
     els.assetName.value = asset ? asset.name : "";
+    els.assetPlatform.value = asset && asset.platform ? asset.platform : "";
     els.assetType.value = asset ? asset.type : state.assetTypes[0];
     els.assetRisk.value = asset ? asset.risk : "Medium";
     els.assetValue.value = asset ? asset.value : "";
+    els.assetPriceUrl.value = asset ? asset.priceUrl || "" : "";
+    hideNewPlatformRow();
     els.assetDialog.showModal();
     els.assetName.focus();
   }
@@ -472,13 +595,23 @@
     var value = Number(els.assetValue.value);
     if (!isFinite(value) || value < 0) return;
 
+    var rawUrl = els.assetPriceUrl.value.trim();
+    var priceUrl = normalizePriceUrl(rawUrl);
+    if (rawUrl && !priceUrl) {
+      alert("Enter a valid http or https price link.");
+      els.assetPriceUrl.focus();
+      return;
+    }
+
     var payload = {
       name: els.assetName.value.trim(),
+      platform: els.assetPlatform.value.trim(),
       type: els.assetType.value,
       risk: els.assetRisk.value,
-      value: value
+      value: value,
+      priceUrl: priceUrl
     };
-    if (!payload.name) return;
+    if (!payload.name || !payload.platform) return;
 
     if (editingAssetId) {
       var existing = portfolio.assets.find(function (asset) {
@@ -486,17 +619,21 @@
       });
       if (existing) {
         existing.name = payload.name;
+        existing.platform = payload.platform;
         existing.type = payload.type;
         existing.risk = payload.risk;
         existing.value = payload.value;
+        existing.priceUrl = payload.priceUrl;
       }
     } else {
       portfolio.assets.push({
         id: uid(),
         name: payload.name,
+        platform: payload.platform,
         type: payload.type,
         risk: payload.risk,
-        value: payload.value
+        value: payload.value,
+        priceUrl: payload.priceUrl
       });
     }
 
@@ -587,7 +724,23 @@
     openAssetDialog(null);
   });
   document.getElementById("btn-asset-cancel").addEventListener("click", function () {
+    hideNewPlatformRow();
     els.assetDialog.close();
+  });
+  document.getElementById("btn-add-platform").addEventListener("click", function () {
+    els.newPlatformRow.hidden = false;
+    els.newPlatformName.focus();
+  });
+  document.getElementById("btn-save-platform").addEventListener("click", saveNewPlatform);
+  els.newPlatformName.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      saveNewPlatform();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      hideNewPlatformRow();
+    }
   });
   document.getElementById("btn-export").addEventListener("click", exportJson);
   document.getElementById("btn-import").addEventListener("click", function () {

@@ -244,7 +244,7 @@ main {
 
 .allocation-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
@@ -360,6 +360,18 @@ main {
   white-space: nowrap;
 }
 
+.price-link {
+  margin-left: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.price-link:hover {
+  text-decoration: underline;
+}
+
 .value-btn {
   background: none;
   border: 0;
@@ -445,6 +457,21 @@ dialog::backdrop {
   gap: 6px;
   font-size: 0.9rem;
   color: var(--muted);
+}
+
+.field-split {
+  display: flex;
+  gap: 8px;
+}
+
+.field-split select,
+.field-split input {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-split .btn {
+  flex-shrink: 0;
 }
 
 .dialog-actions {
